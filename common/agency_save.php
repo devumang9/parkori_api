@@ -2,11 +2,15 @@
 	require_once("../config.php");
 	require_once("../middleware/auth.php");
 	require_once("../middleware/logger.php");
+	require_once("../middleware/permission.php");
+
+	$user = authenticate();
+	$db = getDB();
+
+	// 🔐 Page permission
+	requirePermission($db, $user['Role_ID']);
 
 	try {
-		$user = authenticate();
-		$db = getDB();
-
 		$id = $_POST['id'] ?? null;
 
 		// 🔹 REQUIRED VALIDATION

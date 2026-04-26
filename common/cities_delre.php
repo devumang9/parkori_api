@@ -2,9 +2,13 @@
 	require_once("../config.php");
 	require_once("../middleware/auth.php");
 	require_once("../middleware/logger.php");
+	require_once("../middleware/permission.php");
 
 	$user = authenticate();
 	$db = getDB();
+
+	// 🔐 Page permission
+	requirePermission($db, $user['Role_ID']);
 
 	$data = json_decode(file_get_contents("php://input"), true);
 

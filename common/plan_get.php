@@ -2,9 +2,13 @@
 	require_once("../config.php");
 	require_once("../middleware/auth.php");
 	require_once("../middleware/logger.php");
+	require_once("../middleware/permission.php");
 
 	$user = authenticate();
 	$db = getDB();
+
+	// 🔐 Page permission
+	requirePermission($db, $user['Role_ID']);
 
 	$stmt = $db->prepare("SELECT p.* FROM subscribe_plan p ORDER BY p.Plan_ID DESC");
 	$stmt->execute();   $plans = $stmt->fetchAll(PDO::FETCH_ASSOC);

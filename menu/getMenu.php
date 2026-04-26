@@ -2,49 +2,31 @@
 	require_once("../config.php");
 	require_once("../middleware/auth.php");
 
-	// 🔐 Validate user
 	$user = authenticate();
+	$role_id = $user['Role_ID'];
 
 	$db = getDB();
 
-	// 🔹 Fetch all groups (not deleted)
-	$groupStmt = $db->prepare("SELECT Grp_ID, GrpName, GrpIcon, GrpAlign, GrpAlignID FROM menugroup WHERE GrpDelete = 'N' ORDER BY GrpAlignID ASC");
-	$groupStmt->execute();   $groups = $groupStmt->fetchAll();
+	/* Groups */
+	$groups = $db->query("SELECT Grp_ID, GrpName, GrpIcon FROM menugroup WHERE GrpDelete = 'N' ORDER BY GrpAlignID ASC")->fetchAll();
 
-	// 🔹 Fetch all pages (not deleted)
-	$pageStmt = $db->prepare("SELECT Page_ID, Grp_ID, PageName, PagePath, PageFileName, PageIcon, PageAlignID, PageAlign, PageAccess FROM menupages WHERE PageDelete = 'N' ORDER BY PageAlignID ASC");
-	$pageStmt->execute();   $pages = $pageStmt->fetchAll();
+	/* Pages with rights */
+	$stmt = $db->prepare("SELECT p.Page_ID, p.Grp_ID, p.PageName, p.PagePath, p.PageFileName, p.PageIcon, dr.DefView FROM menupages p LEFT JOIN defaultrights dr ON dr.Page_ID = p.Page_ID AND dr.Role_ID = ? AND dr.DefDelete = 'N' WHERE p.PageDelete = 'N' ORDER BY p.PageAlignID ASC");
+	$stmt->execute([$role_id]);   $pages = $stmt->fetchAll();
 
-	// 🧠 Group pages under groups
+	/* Build menu */
 	$menu = [];
-
 	foreach ($groups as $group) {
 		$groupPages = [];
 		foreach ($pages as $page) {
 			if ($page['Grp_ID'] == $group['Grp_ID']) {
-				$groupPages[] = [
-					"page_id"   => $page['Page_ID'],
-					"name"      => $page['PageName'],
-					"path"      => $page['PagePath'] . $page['PageFileName'],
-					"icon"      => $page['PageIcon'],
-					"align"     => $page['PageAlign'],
-					"access"    => $page['PageAccess']
-				];
+				if ($page['DefView'] !== 'Yes') continue;
+				$groupPages[] = [ "name" => $page['PageName'], "path" => $page['PagePath'] . $page['PageFileName'], "icon" => $page['PageIcon']];
 			}
 		}
 
-		// Only include group if it has pages
-		if (!empty($groupPages)) {
-			$menu[] = [
-				"group_id"   => $group['Grp_ID'],
-				"group_name" => $group['GrpName'],
-				"icon"       => $group['GrpIcon'],
-				"align"      => $group['GrpAlign'],
-				"pages"      => $groupPages
-			];
-		}
+		if (!empty($groupPages)) { $menu[] = ["group_name" => $group['GrpName'], "pages" => $groupPages]; }
 	}
 
-	// 🚀 Response
 	respond(["status" => "success", "menu" => $menu]);
 ?>
