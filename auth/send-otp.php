@@ -16,13 +16,19 @@
 	$username = trim($data['username'] ?? '');
 
 	// 🔍 Validate
-	if (empty($username)) { respond(["status" => "error", "message" => "Contact No / Email ID is required"]); }
+	if (empty($username)) {
+		logActivity($db, ['event' => 'ERROR', 'table' => 'PASSWORD_RESET', 'emp_id' => null, 'action' => "OTP send failed: empty username"]);
+		respond(["status" => "error", "message" => "Contact No / Email ID is required"]);
+	}
 
 	// 🔍 Find user
 	$stmt = $db->prepare("SELECT Emp_ID, EmpFirstName, EmpLastName, EmpEmail, EmpCnct1 FROM employee WHERE EmpEmail = ? OR EmpCnct1 = ? LIMIT 1");
 	$stmt->execute([$username, $username]);   $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-	if (!$user) { respond(["status" => "error", "message" => "User not found"]); }
+	if (!$user) {
+		logActivity($db, ['event' => 'ERROR', 'table' => 'PASSWORD_RESET', 'emp_id' => null, 'action' => "OTP send failed: user not found ($username)"]);
+		respond(["status" => "error", "message" => "User not found"]);
+	}
 
 	$emp_id = $user['Emp_ID'];
 
@@ -127,17 +133,17 @@
 
 				$mail->send();
 			} catch (Exception $e) {
-				error_log("Mailer Error: " . $mail->ErrorInfo);
+				logActivity($db, ['event' => 'ERROR', 'table' => 'password_resets', 'emp_id' => $emp_id, 'action' => "OTP email failed: " . $mail->ErrorInfo]);
 				respond(["status" => "error", "message" => "Failed to send email"]);
 			}
 		}
 
-		// 🧪 Debug (remove later)
-		error_log("OTP for $username is: $otp");
-
 		// ✅ LOG
-		logActivity($db, ['event' => 'OTP_SEND', 'table' => 'password_resets', 'emp_id' => $emp_id, 'action' => "OTP sent for password reset"]);
+		logActivity($db, ['event' => 'OTP_SEND', 'table' => 'PASSWORD_RESET', 'emp_id' => $emp_id, 'action' => "OTP sent for password reset"]);
 		respond(["status" => "success", "message" => "OTP sent successfully"]);
 
-	} catch (Exception $e) { respond(["status" => "error", "message" => "Failed to send OTP"]); }
+	} catch (Exception $e) {
+		logActivity($db, ['event' => 'ERROR', 'table' => 'password_resets', 'emp_id' => $emp_id ?? null, 'action' => "OTP process failed: " . $e->getMessage()]);
+		respond(["status" => "error", "message" => "Failed to send OTP"]);
+	}
 ?>
